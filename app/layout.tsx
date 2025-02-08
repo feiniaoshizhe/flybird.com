@@ -1,23 +1,23 @@
 import "../global.css";
-import { Inter } from "@next/font/google";
-import LocalFont from "@next/font/local";
+import { Inter } from "next/font/google";
+import LocalFont from "next/font/local";
 import { Metadata } from "next";
 import { Analytics } from "./components/analytics";
 
 export const metadata: Metadata = {
   title: {
-    default: "flybirdQAQ.com",
-    template: "%s | flybirdQAQ.com",
+    default: "flybird.com",
+    template: "%s | flybird.com",
   },
   description: "founder of github.io",
   openGraph: {
-    title: "flybirdQAQ.com",
+    title: "flybird.com",
     description: "founder of github.io",
-    url: "https://flybirdQAQ.com",
+    url: "https://flybird.com",
     siteName: "chronark.com",
     images: [
       {
-        url: "https://flybirdQAQ.com/og.png",
+        url: "https://flybird.com/og.png",
         width: 1920,
         height: 1080,
       },
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     },
   },
   twitter: {
-    title: "flybirdQAQ",
+    title: "feiniaoshizhe",
     card: "summary_large_image",
   },
   icons: {

@@ -1,0 +1,248 @@
+---
+title: ".net中redis缓存和memory缓存"
+description: A minimal library for access control. It is designed to be used together with opaque access tokens by providing a simple interface to define roles with different access permissions and verifying requests to resources.
+repository: chronark/access
+date: "2024-11-13"
+published: true
+---
+
+一般缓存采用redis缓存，当然也存在没有redis的情况，所以备用方案是memory缓存。
+
+但是使用的时候要进行统一的注入,起码要保证两者继承的接口是一致的。
+
+需要用到的包:`Microsoft.Extensions.Caching.StackExchangeRedis `
+
+### 1. 建立缓存的 接口和实现。
+CacheService和ICacheService，用于注入的时候使用接口比较简单，包括常用的添加，删除，清空，获取，判断是否存在。采用异步方式。    
+``` C#
+public interface ICacheService
+{
+    Task SetAsync(string key, object value, TimeSpan? expirationTime = null);
+    Task GetAsync(string key);
+    Task RemoveAsync(string key);
+    Task<bool> ExistAsync(string key);
+    Task ClearAsync();
+}
+```
+
+### 2.分别建立 redis 和 memory 实现接口`ICacheServiceredis`如下:
+redis 实现如下：
+``` C#
+public class RedisCacheService(IConnectionMultiplexer connection) : ICacheService
+{
+    private readonly IConnectionMultiplexer connection = connection;
+    private readonly IDatabase redis = connection.GetDatabase();
+
+    public async Task ClearAsync()
+    {
+        var endpoints = connection.GetEndPoints();
+        var tasks = endpoints.Select(async x =>
+        {
+            var server = connection.GetServer(x);
+            foreach (var key in server.Keys())
+            {
+                await redis.KeyDeleteAsync(key);
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    public async Task<bool> ExistAsync(string key)
+    {
+        return await redis.KeyExistsAsync(key);
+    }
+
+    public async Task<string> GetAsync(string key)
+    {
+        return await redis.StringGetAsync(key);
+    }
+
+    public async Task RemoveAsync(string key)
+    {
+        await redis.KeyDeleteAsync(key);
+    }
+
+    public async Task SetAsync(string key, object value, TimeSpan? expirationTime = null)
+    {
+        if (value != null)
+        {
+            //默认2H
+            expirationTime ??= TimeSpan.FromHours(2);
+            if (value is string cacheStr)
+            {
+                await redis.StringSetAsync(key, cacheStr, expirationTime);
+            }
+            else
+            {
+                await redis.StringSetAsync(key, JsonSerializer.Serialize(value), expirationTime);
+            }
+        }
+    }
+}
+```
+
+memory 实现如下: 
+``` C# 
+public class MemoryCacheService(IMemoryCache memory) : ICacheService
+{
+    private readonly IMemoryCache memory = memory;
+
+    public Task ClearAsync()
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> ExistAsync(string key)
+    {
+        var exists = memory.TryGetValue(key, out _);
+        return Task.FromResult(exists);
+    }
+
+    public Task<string> GetAsync(string key)
+    {
+        if (memory.TryGetValue(key, out string value))
+        {
+            return Task.FromResult(value);
+        }
+
+        return Task.FromResult<string>(null);
+    }
+
+    public Task RemoveAsync(string key)
+    {
+        memory.Remove(key);
+        return Task.CompletedTask;
+    }
+
+    public Task SetAsync(string key, object value, TimeSpan? expirationTime = null)
+    {
+        if (value != null)
+        {
+            //默认2H
+            expirationTime ??= TimeSpan.FromHours(2);
+            if (value is string cacheStr)
+            {
+                memory.Set(key, cacheStr, expirationTime.Value);
+            }
+            else
+            {
+                memory.Set(key, JsonSerializer.Serialize(value), expirationTime.Value);
+            }
+        }
+        return Task.CompletedTask;
+    }
+}
+```
+
+### 3. memory 和 redis 切换
+``` C# 
+public class CacheService : ICacheService
+{
+    private readonly ICacheService cache;
+
+    public CacheService(IConnectionMultiplexer connection, IMemoryCache memory)
+    {
+        if (connection.IsConnected)
+        {
+            cache = new RedisCacheService(connection);
+        }
+        else
+        {
+            cache = new MemoryCacheService(memory);
+        }
+    }
+
+    public async Task ClearAsync()
+    {
+        await cache.ClearAsync();
+    }
+
+    public async Task<bool> ExistAsync(string key)
+    {
+        return await cache.ExistAsync(key);
+    }
+
+    public async Task<string> GetAsync(string key)
+    {
+        return await cache.GetAsync(key);
+    }
+
+    public async Task RemoveAsync(string key)
+    {
+        await cache.RemoveAsync(key);
+    }
+
+    public async Task SetAsync(string key, object value, TimeSpan? expirationTime = null)
+    {
+        await cache.SetAsync(key, value, expirationTime);
+    }
+}
+```
+### 4.依赖注入
+redis配置主要是通过配置文件读取，格式如下：
+
+``` json
+
+{
+    "Redis": {
+        // 未启用或连接有问题时，则开启memory缓存。 redis瞬时注入，因为数据在redis里共享，
+        "Enable": false,
+        "UseCluster": false,
+        "ConnectionSingle": "127.0.0.1:6379",
+        "ConnectionCluster": "node1:6379,node2:6379,node3:6379",
+        "InstanceName": ""
+    }
+}
+```
+``` C#
+// memory是整个程序的内存，单例好些  
+public static void AddCacheSetup(this IServiceCollection services)
+{
+    if (AppSettings.AppString("Redis:Enable").ToBool())
+    {
+        var redisConfig = string.Empty;
+
+        if (AppSettings.AppString("Redis:UseCluster").ToBool())
+        {
+            redisConfig = AppSettings.AppString("Redis:ConnectionCluster");
+        }
+        else
+        {
+            redisConfig = AppSettings.AppString("Redis:ConnectionSingle");
+        }
+
+        var configurationOptions = ConfigurationOptions.Parse(redisConfig);
+        configurationOptions.ResolveDns = true;
+
+        try
+        {
+            var connectionMultiplexer = ConnectionMultiplexer.Connect(configurationOptions);
+
+            services.AddStackExchangeRedisCache(x =>
+            {
+                x.ConnectionMultiplexerFactory = () => Task.FromResult(connectionMultiplexer as IConnectionMultiplexer);
+                var instanceName = AppSettings.AppString("Redis:InstanceName");
+                if (!string.IsNullOrEmpty(instanceName))
+                {
+                    x.InstanceName = instanceName;
+                }
+            });
+
+            services.AddTransient<ICacheService, RedisCacheService>();
+        }
+        catch (Exception)
+        {
+            services.AddMemoryCache();
+            services.AddSingleton<ICacheService, MemoryCacheService>();
+        }
+    }
+    else
+    {
+        services.AddMemoryCache();
+        services.AddSingleton<ICacheService, MemoryCacheService>();
+    }
+}
+```
+最后Program里: `builder.Services.AddCacheSetup()`;
+只需要在使用的地方注入ICacheService，就可以使用了，而不用在意用的是 redis 缓存还是 memory 缓存

@@ -1,15 +1,17 @@
 import Link from "next/link";
 import React from "react";
-import { allProjects } from "contentlayer/generated";
 import { Navigation } from "../components/nav";
 import { Card } from "../components/card";
-import { Article } from "./article";
+import { Article } from "../components/article";
 // import { Redis } from "@upstash/redis";
 import { Eye } from "lucide-react";
+import getPosts from "@/util/content";
+import { notFound } from "next/navigation";
 
 // const redis = Redis.fromEnv();
 
 export const revalidate = 60;
+
 export default async function ProjectsPage() {
   const views = {} as Record<string, number>;
   // TODO 获取浏览量
@@ -21,23 +23,21 @@ export default async function ProjectsPage() {
   //   acc[allProjects[i].slug] = v ?? 0;
   //   return acc;
   // }, {} as Record<string, number>);
-
-  const featured = allProjects.find((project) => project.slug === "unkey")!;
-  const top2 = allProjects.find((project) => project.slug === "planetfall")!;
-  const top3 = allProjects.find((project) => project.slug === "highstorm")!;
-  const sorted = allProjects
-    .filter((p) => p.published)
-    .filter(
-      (project) =>
-        project.slug !== featured.slug &&
-        project.slug !== top2.slug &&
-        project.slug !== top3.slug
-    )
+  // 获取所有发布的文章并按照日期排序
+  const allProjects = getPosts("projects")
+    .filter((p) => p.metadata.published)
     .sort(
       (a, b) =>
-        new Date(b.date ?? Number.POSITIVE_INFINITY).getTime() -
-        new Date(a.date ?? Number.POSITIVE_INFINITY).getTime()
+        new Date(b.metadata.date ?? Number.POSITIVE_INFINITY).getTime() -
+        new Date(a.metadata.date ?? Number.POSITIVE_INFINITY).getTime()
     );
+
+  if (!allProjects.length) {
+    notFound();
+  }
+
+  const [top1, top2, top3] = allProjects.slice(0, 3);
+  const sorted = allProjects.slice(3);
 
   return (
     <div className="relative pb-16">
@@ -55,15 +55,17 @@ export default async function ProjectsPage() {
 
         <div className="grid grid-cols-1 gap-8 mx-auto lg:grid-cols-2 ">
           <Card>
-            <Link href={`/projects/${featured.slug}`}>
+            <Link href={`/projects/${top1.slug}`}>
               <article className="relative w-full h-full p-4 md:p-8">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-xs text-zinc-100">
-                    {featured.date ? (
-                      <time dateTime={new Date(featured.date).toISOString()}>
+                    {top1.metadata.date ? (
+                      <time
+                        dateTime={new Date(top1.metadata.date).toISOString()}
+                      >
                         {Intl.DateTimeFormat(undefined, {
                           dateStyle: "medium",
-                        }).format(new Date(featured.date))}
+                        }).format(new Date(top1.metadata.date))}
                       </time>
                     ) : (
                       <span>SOON</span>
@@ -72,7 +74,7 @@ export default async function ProjectsPage() {
                   <span className="flex items-center gap-1 text-xs text-zinc-500">
                     <Eye className="w-4 h-4" />{" "}
                     {Intl.NumberFormat("en-US", { notation: "compact" }).format(
-                      views[featured.slug] ?? 0
+                      views[top1.slug] ?? 0
                     )}
                   </span>
                 </div>
@@ -81,10 +83,10 @@ export default async function ProjectsPage() {
                   id="featured-post"
                   className="mt-4 text-3xl font-bold text-zinc-100 group-hover:text-white sm:text-4xl font-display"
                 >
-                  {featured.title}
+                  {top1.metadata.title}
                 </h2>
                 <p className="mt-4 leading-8 duration-150 text-zinc-400 group-hover:text-zinc-300">
-                  {featured.description}
+                  {top1.metadata.description}
                 </p>
                 <div className="absolute bottom-4 md:bottom-8">
                   <p className="hidden text-zinc-200 hover:text-zinc-50 lg:block">
