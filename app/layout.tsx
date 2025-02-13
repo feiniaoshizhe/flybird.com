@@ -1,23 +1,24 @@
 import "../global.css";
-import { Inter } from "next/font/google";
-import LocalFont from "next/font/local";
+import { Inter } from "@next/font/google";
+import LocalFont from "@next/font/local";
 import { Metadata } from "next";
 import { Analytics } from "./components/analytics";
+import { baseUrl, siteName } from "./sitemap";
 
 export const metadata: Metadata = {
   title: {
-    default: "flybird.com",
-    template: "%s | flybird.com",
+    default: `${siteName}`,
+    template: `%s | ${siteName}`,
   },
-  description: "founder of github.io",
+  description: "",
   openGraph: {
-    title: "flybird.com",
-    description: "founder of github.io",
-    url: "https://flybird.com",
-    siteName: "chronark.com",
+    title: `${siteName}`,
+    description: "",
+    url: `${baseUrl}`,
+    siteName: `${siteName}`,
     images: [
       {
-        url: "https://flybird.com/og.png",
+        url: `${baseUrl}/og.png`,
         width: 1920,
         height: 1080,
       },
@@ -35,10 +36,6 @@ export const metadata: Metadata = {
       "max-image-preview": "large",
       "max-snippet": -1,
     },
-  },
-  twitter: {
-    title: "feiniaoshizhe",
-    card: "summary_large_image",
   },
   icons: {
     shortcut: "/favicon.png",
