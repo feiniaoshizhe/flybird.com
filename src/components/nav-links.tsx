@@ -2,44 +2,37 @@
 
 import {
   ArrowUpRightIcon,
-  Folder,
-  MoreHorizontal,
-  Share,
-  Trash2,
+  // Folder,
+  // MoreHorizontal,
+  // Share,
+  // Trash2,
 } from "lucide-react";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// import {
+//   DropdownMenu,
+//   DropdownMenuContent,
+//   DropdownMenuItem,
+//   DropdownMenuSeparator,
+//   DropdownMenuTrigger,
+// } from "@/components/ui/dropdown-menu";
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  SidebarMenuAction,
+  // SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
+  // useSidebar,
 } from "@/components/ui/sidebar";
-import { IconType } from "react-icons/lib";
 
-export function NavLinks({
-  links,
-}: {
-  links: {
-    title: string;
-    url: string;
-    icon: IconType;
-  }[];
-}) {
-  const { isMobile } = useSidebar();
+import { ContactLink } from "@/types/main-menu";
+
+export function NavLinks({ links }: { links: ContactLink[] }) {
+  // const { isMobile } = useSidebar();
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Contact Me</SidebarGroupLabel>
+      <SidebarGroupLabel>Contact me</SidebarGroupLabel>
       <SidebarMenu>
         {links.map((link) => (
           <SidebarMenuItem key={link.title}>
